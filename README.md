@@ -1,12 +1,12 @@
 # Proxy Server with JWT Authentication
 
-This is a lightweight HTTP proxy server built using the Sinatra framework. It acts as a pass-through proxy, allowing requests to be forwarded to a specified target URL. Additionally, it provides JWT (JSON Web Token) authentication to secure requests. 
+This is a lightweight HTTP proxy server built using the Sinatra framework. It acts as a pass-through proxy, allowing requests to be forwarded to a specified target URL. Additionally, it provides JWT (JSON Web Token) authentication to secure requests.
 
 ## Features
 
 - **CORS Support**: Handles CORS headers, allowing cross-origin requests.
 - **JWT Authentication**: Verifies the presence and validity of the `x-bump-jwt-token` header to ensure requests are authorized.
-- **Flexible HTTP Method Support**: Supports `GET`, `POST`, `PUT`, and `DELETE` methods for forwarding client requests to the target server.
+- **Flexible HTTP Method Support**: Supports `GET`, `POST`, `PUT`,`PATCH`, and `DELETE` methods for forwarding client requests to the target server.
 - **Automatic Request Forwarding**: Forwards requests to the specified target URL while preserving headers and request bodies.
 
 ## Getting Started
@@ -52,11 +52,11 @@ The server verifies the `x-bump-jwt-token` for every request. If the token is mi
 
 The server provides the following endpoints for request forwarding:
 
-- **GET** `/proxy?url=your-target-url`
-- **POST** `/proxy?url=your-target-url`
-- **PUT** `/proxy?url=your-target-url`
-- **PATCH** `/proxy?url=your-target-url`
-- **DELETE** `/proxy?url=your-target-url`
+- **GET** `?url=your-target-url`
+- **POST** `?url=your-target-url`
+- **PUT** `?url=your-target-url`
+- **PATCH** `?url=your-target-url`
+- **DELETE** `?url=your-target-url`
 
 Each endpoint forwards the request to the target URL specified in the query parameter.
 
@@ -64,12 +64,12 @@ Each endpoint forwards the request to the target URL specified in the query para
 
 **GET request:**
 ```bash
-curl -X GET "http://localhost:4567/proxy?url=https://jsonplaceholder.typicode.com/posts" -H "x-bump-jwt-token: YOUR_TOKEN"
+curl -X GET "http://localhost:4567/?url=https://jsonplaceholder.typicode.com/posts" -H "x-bump-jwt-token: YOUR_TOKEN"
 ```
 
 **POST request:**
 ```bash
-curl -X POST "http://localhost:4567/proxy?url=https://jsonplaceholder.typicode.com/posts" \
+curl -X POST "http://localhost:4567/?url=https://jsonplaceholder.typicode.com/posts" \
      -H "Content-Type: application/json" \
      -H "x-bump-jwt-token: YOUR_TOKEN" \
      -d '{"title":"foo","body":"bar","userId":1}'
@@ -86,7 +86,7 @@ The server includes CORS headers for cross-origin access. Preflight OPTIONS requ
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
 
 ## Contributing
 
