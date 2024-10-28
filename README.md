@@ -1,1 +1,1 @@
-# cors-anywhere-ruby
+# cors-toujours
