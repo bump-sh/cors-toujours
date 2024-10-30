@@ -4,12 +4,14 @@ require "uri"
 require "json"
 require "jwt"
 require "debug"
+require "dotenv/load"
+require "openssl/pkey"
 
 class ProxyServer < Sinatra::Base
   set :port, 4567
 
   # Secret key for JWT verification
-  SECRET_KEY = "your-secret-key"
+  PUBLIC_KEY = ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
 
   # Handle CORS headers
   before do
@@ -30,7 +32,8 @@ class ProxyServer < Sinatra::Base
 
     # Verify JWT token
     begin
-      JWT.decode(token, SECRET_KEY, true, {algorithm: "HS256"})
+      public_key = OpenSSL::PKey.read(PUBLIC_KEY)
+      JWT.decode(token, public_key, true, {algorithm: "RS512"})
     rescue JWT::DecodeError
       halt 401, {error: "Invalid token"}.to_json
     end

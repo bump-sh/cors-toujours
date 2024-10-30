@@ -24,17 +24,17 @@ gem install sinatra jwt
 
 ### Configuration
 
-- Set the `SECRET_KEY` environment variable for JWT verification:
-  ```ruby
-  # .env
-  SECRET_KEY = 'your-secret-key'
+Use the script to rotate the keys
+  ```bash
+  ./rotate_keys
   ```
+This will add the keys to the .env file
 
 ### Starting the Server
 
 Run the following command to start the server on port 4567:
 ```bash
-ruby proxy_server.rb
+rackup config.ru
 ```
 
 ### Making Requests

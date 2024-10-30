@@ -2,9 +2,10 @@ require "rspec"
 require "rack/test"
 require "webmock/rspec"
 require_relative "../proxy_server"
+require "dotenv/load"
 require "jwt"
 
-SECRET_KEY = "your-secret-key"
+PRIVATE_KEY = ENV.fetch("JWT_SIGNING_PRIVATE_KEY").gsub("\\n", "\n")
 
 describe "ProxyServer" do
   include Rack::Test::Methods
@@ -17,7 +18,10 @@ describe "ProxyServer" do
     expect(last_response.headers[k]).to eq v
   end
 
-  let(:valid_token) { JWT.encode({data: "test"}, SECRET_KEY, "HS256") }
+  let(:valid_token) do
+    private_key = OpenSSL::PKey::RSA.new(PRIVATE_KEY)
+    JWT.encode({data: "test"}, private_key, "RS512")
+  end
   let(:invalid_token) { "invalid.token.here" }
   let(:target_url) { "https://jsonplaceholder.typicode.com/posts" }
 
@@ -37,21 +41,27 @@ describe "ProxyServer" do
     before(:each) do
       options "/?url=#{target_url}"
     end
+
     it "returns CORS headers" do
       expect_header("access-control-allow-origin", "*")
     end
   end
 
   context "when x-bump-jwt-token is present" do
-    before(:each) do
-      header "x-bump-jwt-token", valid_token
-      header "x-foo", "bar"
-      get "/?url=#{target_url}"
-    end
+    context "and is valid" do
+      before(:each) do
+        header "x-bump-jwt-token", valid_token
+        header "x-foo", "bar"
+        get "/?url=#{target_url}"
+      end
 
-    it "returns 200 for a valid token" do
-      expect(last_response.status).to eq(200)
-      expect_header("access-control-allow-origin", "*")
+      it "returns 200" do
+        expect(last_response.status).to eq(200)
+      end
+
+      it "returns cors headers" do
+        expect_header("access-control-allow-origin", "*")
+      end
     end
 
     it "returns 401 for an invalid token" do

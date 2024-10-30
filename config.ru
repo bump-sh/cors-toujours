@@ -1,4 +1,4 @@
 # config.ru
 
-require "./proxy_server" # Adjust the path if necessary
+require "./proxy_server"
 run ProxyServer
