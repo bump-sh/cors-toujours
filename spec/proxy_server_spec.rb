@@ -39,7 +39,7 @@ describe "ProxyServer" do
 
   context "preflight request" do
     before(:each) do
-      options "/?url=#{target_url}"
+      options "/#{target_url}"
     end
 
     it "returns CORS headers" do
@@ -52,7 +52,7 @@ describe "ProxyServer" do
       before(:each) do
         header "x-bump-jwt-token", valid_token
         header "x-foo", "bar"
-        get "/?url=#{target_url}"
+        get "/#{target_url}"
       end
 
       it "returns 200" do
@@ -66,7 +66,7 @@ describe "ProxyServer" do
 
     it "returns 401 for an invalid token" do
       header "x-bump-jwt-token", invalid_token
-      get "/?url=#{target_url}"
+      get "/#{target_url}"
 
       expect(last_response.status).to eq(401)
       expect_header("access-control-allow-origin", "*")
@@ -76,7 +76,7 @@ describe "ProxyServer" do
 
   context "when x-bump-jwt-token is missing" do
     it "returns 401 Unauthorized" do
-      get "/?url=#{target_url}"
+      get "/#{target_url}"
 
       expect(last_response.status).to eq(401)
       expect_header("access-control-allow-origin", "*")
@@ -88,7 +88,7 @@ describe "ProxyServer" do
     it "forwards headers and body for POST requests" do
       header "x-bump-jwt-token", valid_token
       header "Content-Type", "application/json"
-      post "/?url=#{target_url}", {title: "foo", body: "bar", userId: 1}.to_json
+      post "/#{target_url}", {title: "foo", body: "bar", userId: 1}.to_json
 
       expect(last_response.status).to eq(201)  # Expect created status if target server responds as expected
       response_body = JSON.parse(last_response.body)
@@ -101,7 +101,7 @@ describe "ProxyServer" do
     it "forwards headers and body for PUT requests" do
       header "x-bump-jwt-token", valid_token
       header "Content-Type", "application/json"
-      put "/?url=#{target_url}/1", {id: 1, title: "updated title"}.to_json
+      put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
 
       expect(last_response.status).to eq(200)  # Expect OK status if target server responds as expected
       response_body = JSON.parse(last_response.body)

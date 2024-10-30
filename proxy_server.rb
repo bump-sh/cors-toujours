@@ -9,6 +9,7 @@ require "openssl/pkey"
 
 class ProxyServer < Sinatra::Base
   set :port, 4567
+  # set :logging, true
 
   # Secret key for JWT verification
   PUBLIC_KEY = ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
@@ -22,20 +23,22 @@ class ProxyServer < Sinatra::Base
 
   # Verify JWT token presence and signature
   before do
-    token = request.env["HTTP_X_BUMP_JWT_TOKEN"]
+    if request.env["REQUEST_METHOD"] != "OPTIONS"
+      token = request.env["HTTP_X_BUMP_JWT_TOKEN"]
 
-    # Check if token is missing
-    if token.nil?
-      headers "Content-Type" => "application/json"
-      halt 401, {error: "x-bump-jwt-token header is missing"}.to_json
-    end
+      # Check if token is missing
+      if token.nil?
+        headers "Content-Type" => "application/json"
+        halt 401, {error: "x-bump-jwt-token header is missing"}.to_json
+      end
 
-    # Verify JWT token
-    begin
-      public_key = OpenSSL::PKey.read(PUBLIC_KEY)
-      JWT.decode(token, public_key, true, {algorithm: "RS512"})
-    rescue JWT::DecodeError
-      halt 401, {error: "Invalid token"}.to_json
+      # Verify JWT token
+      begin
+        public_key = OpenSSL::PKey.read(PUBLIC_KEY)
+        JWT.decode(token, public_key, true, {algorithm: "RS512"})
+      rescue JWT::DecodeError
+        halt 401, {error: "Invalid token"}.to_json
+      end
     end
   end
 
@@ -46,7 +49,7 @@ class ProxyServer < Sinatra::Base
 
   helpers do
     def forward_request(method)
-      target_url = params["url"]
+      target_url = params["splat"][0].gsub(":/", "://")
       uri = URI.parse(target_url)
 
       # Set up the request to the target server
@@ -66,43 +69,53 @@ class ProxyServer < Sinatra::Base
         target_request[formatted_header] = value unless formatted_header == "X-Bump-Jwt-Token"
       end
 
-      # Forward request body for POST and PUT methods
-      if %w[POST PUT PATCH].include?(method)
+      # Forward request body for POST, PUT and PATCH methods
+      if !%w[GET HEAD OPTIONS].include?(method) && request.body && request.content_type
         target_request.content_type = request.content_type
         target_request.body = request.body.read
       end
 
+      # Log the headers for debugging purposes
+      puts "Forwarding headers to target request:"
+      target_request.each_header do |header, value|
+        puts "#{header}: #{value}"
+      end
       # Execute the request to the target server
       Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
         response = http.request(target_request)
 
         # Pass the target server response back to the client
-        puts response.read_body
         status response.code
         headers "Content-Type" => response.content_type
-        body response.body
+
+        content_encoding = response.get_fields "content-encoding"
+        if content_encoding && content_encoding.include?("gzip")
+          body Zlib::GzipReader.new(StringIO.new(response.body)).read
+        else
+          body response.body
+        end
       end
     end
   end
 
   # Proxy endpoints
-  get "/" do
+  get "/*" do
     forward_request("GET")
   end
 
-  post "/" do
+  post "/*" do
     forward_request("POST")
   end
 
-  put "/" do
+  put "/*" do
     forward_request("PUT")
   end
 
-  patch "/" do
+  patch "/*" do
     forward_request("PATCH")
   end
 
-  delete "/" do
+  delete "/*" do
     forward_request("DELETE")
   end
 end
