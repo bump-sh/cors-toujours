@@ -3,9 +3,12 @@ require "net/http"
 require "uri"
 require "json"
 require "jwt"
-require "debug"
-require "dotenv/load"
 require "openssl/pkey"
+
+if ["development", "test"].include? ENV['RACK_ENV']
+  require "dotenv/load"
+  require "debug"
+end
 
 class ProxyServer < Sinatra::Base
   set :port, 4567
@@ -75,11 +78,15 @@ class ProxyServer < Sinatra::Base
         target_request.body = request.body.read
       end
 
+      # Override host
+      target_request["host"] = uri.hostname
+
       # Log the headers for debugging purposes
-      puts "Forwarding headers to target request:"
-      target_request.each_header do |header, value|
-        puts "#{header}: #{value}"
-      end
+      # puts "Forwarding headers to target request:"
+      # target_request.each_header do |header, value|
+      #   puts "#{header}: #{value}"
+      # end
+
       # Execute the request to the target server
       Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
         response = http.request(target_request)
