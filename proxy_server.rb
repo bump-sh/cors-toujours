@@ -24,12 +24,12 @@ class ProxyServer < Sinatra::Base
   # Verify JWT token presence and signature
   before do
     if request.env["REQUEST_METHOD"] != "OPTIONS"
-      token = request.env["HTTP_X_BUMP_JWT_TOKEN"]
+      token = request.env["HTTP_X_BUMP_PROXY_TOKEN"]
 
       # Check if token is missing
       if token.nil?
         headers "Content-Type" => "application/json"
-        halt 401, {error: "x-bump-jwt-token header is missing"}.to_json
+        halt 401, {error: "x-bump-proxy-token header is missing"}.to_json
       end
 
       # Verify JWT token
@@ -66,7 +66,7 @@ class ProxyServer < Sinatra::Base
       client_headers = request.env.select { |key, _| key.start_with?("HTTP_") }
       client_headers.each do |header, value|
         formatted_header = header.sub("HTTP_", "").split("_").map(&:capitalize).join("-")
-        target_request[formatted_header] = value unless formatted_header == "X-Bump-Jwt-Token"
+        target_request[formatted_header] = value unless formatted_header == "X-Bump-Proxy-Token"
       end
 
       # Forward request body for POST, PUT and PATCH methods
