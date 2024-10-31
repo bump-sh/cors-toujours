@@ -18,11 +18,36 @@ describe "ProxyServer" do
     expect(last_response.headers[k]).to eq v
   end
 
-  let(:valid_token) do
-    private_key = OpenSSL::PKey::RSA.new(PRIVATE_KEY)
-    JWT.encode({data: "test"}, private_key, "RS512")
+  def expect_json_body(k, v)
+    expect(JSON.parse(last_response.body)[k]).to eq v
   end
-  let(:invalid_token) { "invalid.token.here" }
+
+  let(:verb) { "GET" }
+  let(:servers) do
+    [
+      "https://jsonplaceholder.typicode.com/"
+    ]
+  end
+
+  let(:path) { "/posts" }
+  let(:exp) { Time.now.to_i + 4 * 3600 }
+
+  let(:payload) do
+    {
+      servers: servers,
+      verb: verb,
+      path: path,
+      exp: exp
+    }
+  end
+
+  let(:proxy_token) do
+    private_key = OpenSSL::PKey::RSA.new(PRIVATE_KEY)
+    JWT.encode(payload, private_key, "RS512")
+  end
+
+  let(:invalid_proxy_token) { "invalid.token.here" }
+
   let(:target_url) { "https://jsonplaceholder.typicode.com/posts" }
 
   # Mock external requests with WebMock or a similar tool (if desired)
@@ -49,63 +74,236 @@ describe "ProxyServer" do
 
   context "when x-bump-jwt-token is present" do
     context "and is valid" do
+      context "when no path params" do
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 200" do
+          expect(last_response.status).to eq(200)
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when multiple path params" do
+        let(:path) { "/posts/{post_id}/comments/{id}" }
+        let(:target_url) { "https://jsonplaceholder.typicode.com/posts/123/comments/456" }
+
+        before(:each) do
+          stub_request(:get, "https://jsonplaceholder.typicode.com/posts/123/comments/456")
+            .with(
+              headers: {
+              'Accept'=>'*/*',
+              'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+              'Cookie'=>'',
+              'Host'=>'jsonplaceholder.typicode.com',
+              'User-Agent'=>'Ruby',
+              'X-Foo'=>'bar'
+              })
+            .to_return(status: 200, body: "", headers: {})
+
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+
+
+        end
+
+        it "returns 200" do
+          expect(last_response.status).to eq(200)
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+
+    end
+
+    context "but is invalid" do
       before(:each) do
-        header "x-bump-jwt-token", valid_token
-        header "x-foo", "bar"
-        get "/#{target_url}"
+          header "x-bump-proxy-token", invalid_proxy_token
+          get "/#{target_url}"
+        end
+
+      it "returns a 401 Unauthorized status" do
+        expect(last_response.status).to eq(401)
       end
 
-      it "returns 200" do
-        expect(last_response.status).to eq(200)
-      end
-
-      it "returns cors headers" do
+      it "includes CORS headers in the response" do
         expect_header("access-control-allow-origin", "*")
+      end
+
+      it "returns the correct error message in the response body" do
+        expect(JSON.parse(last_response.body)["error"]).to eq("Invalid token")
       end
     end
 
-    it "returns 401 for an invalid token" do
-      header "x-bump-jwt-token", invalid_token
-      get "/#{target_url}"
+    describe  "Token Payload" do
+      context "when token is expired" do
+        let(:exp) { Time.now.to_i - 500 } # 5 minutes ago
+  
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+  
+        it "returns 401" do
+          expect(last_response.status).to eq(401)
+        end
+  
+        it "has error message" do
+          expect_json_body("error", "Token has expired")
+        end
+  
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
 
-      expect(last_response.status).to eq(401)
-      expect_header("access-control-allow-origin", "*")
-      expect(JSON.parse(last_response.body)["error"]).to eq("Invalid token")
+      context "when HTTP method is not allowed" do
+        let(:verb) { "PATCH" } # wrong http method
+
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 403" do
+          expect(last_response.status).to eq(403)
+        end
+
+        it "has error message" do
+          expect_json_body("error", "HTTP method not allowed")
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when server is not allowed" do
+        let(:servers) { ["https://staging.bump.sh/api/v1/"] }
+
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 403" do
+          expect(last_response.status).to eq(403)
+        end
+
+        it "has error message" do
+          expect_json_body("error", "Server not allowed")
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when is not allowed" do
+        let(:path) { "/comments" }
+
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 403" do
+          expect(last_response.status).to eq(403)
+        end
+
+        it "has error message" do
+          expect_json_body("error", "Path not allowed")
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
     end
   end
 
-  context "when x-bump-jwt-token is missing" do
-    it "returns 401 Unauthorized" do
-      get "/#{target_url}"
+  context "when x-bump-proxy-token is missing" do
+    before(:each) do
+        get "/#{target_url}"
+      end
 
+    it "returns 401 Unauthorized status" do
       expect(last_response.status).to eq(401)
+    end
+
+    it "includes CORS headers in the response" do
       expect_header("access-control-allow-origin", "*")
-      expect(JSON.parse(last_response.body)["error"]).to eq("x-bump-jwt-token header is missing")
+    end
+
+    it "returns the correct error message in the response body" do
+      expect(JSON.parse(last_response.body)["error"]).to eq("x-bump-proxy-token header is missing")
     end
   end
 
   context "request forwarding" do
-    it "forwards headers and body for POST requests" do
-      header "x-bump-jwt-token", valid_token
-      header "Content-Type", "application/json"
-      post "/#{target_url}", {title: "foo", body: "bar", userId: 1}.to_json
+    context "when POST requests" do
+      let(:verb) { "POST" }
+      let(:request_body) { {title: "foo", body: "bar", userId: 1} }
 
-      expect(last_response.status).to eq(201)  # Expect created status if target server responds as expected
-      response_body = JSON.parse(last_response.body)
-      expect_header("access-control-allow-origin", "*")
-      expect(response_body["title"]).to eq("foo")
-      expect(response_body["body"]).to eq("bar")
-      expect(response_body["userId"]).to eq(1)
+      before(:each) do
+        header "x-bump-proxy-token", proxy_token
+        header "Content-Type", "application/json"
+        post "/#{target_url}", request_body.to_json
+      end
+
+      it "returns a 201 Created status" do
+        expect(last_response.status).to eq(201)
+      end
+
+      it "includes CORS headers in the response" do
+        expect_header("access-control-allow-origin", "*")
+      end
+
+      it "returns the correct title in the response body" do
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["title"]).to eq("foo")
+      end
+
+      it "returns the correct body in the response body" do
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["body"]).to eq("bar")
+      end
+
+      it "returns the correct userId in the response body" do
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["userId"]).to eq(1)
+      end
     end
 
-    it "forwards headers and body for PUT requests" do
-      header "x-bump-jwt-token", valid_token
-      header "Content-Type", "application/json"
-      put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
+    context "when PUT requests" do
+      let(:verb) { "PUT" }
+      let(:path) { "/posts/{id}" }
 
-      expect(last_response.status).to eq(200)  # Expect OK status if target server responds as expected
-      response_body = JSON.parse(last_response.body)
-      expect(response_body["title"]).to eq("updated title")
+      before(:each) do
+        header "x-bump-proxy-token", proxy_token
+        header "Content-Type", "application/json"
+        put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
+      end
+
+      it "forwards headers and body for PUT requests" do
+        expect(last_response.status).to eq(200)  # Expect OK status if target server responds as expected
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["title"]).to eq("updated title")
+      end
     end
   end
 end

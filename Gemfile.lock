@@ -24,6 +24,7 @@ GEM
       base64
     language_server-protocol (3.17.0.3)
     lint_roller (1.1.0)
+    logger (1.6.1)
     mustermann (3.0.3)
       ruby2_keywords (~> 0.0.1)
     nio4r (2.7.3)
@@ -122,6 +123,7 @@ DEPENDENCIES
   debug (>= 1.0.0)
   dotenv
   jwt (~> 2.9)
+  logger
   puma
   rack-test (~> 2.1)
   rackup (~> 2.1)

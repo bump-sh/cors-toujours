@@ -37,6 +37,13 @@ Run the following command to start the server on port 4567:
 rackup config.ru
 ```
 
+### Run the tests
+
+Run the following command to run the test
+```bash
+RACK_ENV=test bundle exec rspec --color -fd spec/proxy_server_spec.rb
+```
+
 ### Making Requests
 
 - Include the `x-bump-jwt-token` header with a valid JWT in your requests.

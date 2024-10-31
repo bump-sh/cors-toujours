@@ -8,6 +8,7 @@ gem "jwt", "~> 2.9"
 gem "sinatra", "~> 4.0"
 gem "rackup", "~> 2.1"
 gem "puma"
+gem "logger"
 
 group :development, :test do
   gem "rspec", "~> 3.13"
