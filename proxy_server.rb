@@ -17,6 +17,18 @@ class ProxyServer < Sinatra::Base
   # Secret key for JWT verification
   PUBLIC_KEY = ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
 
+  error JWT::ExpiredSignature do
+    halt 401, {error: "Token has expired"}.to_json
+  end
+
+  error JWT::DecodeError do
+    halt 401, {error: "Invalid token"}.to_json
+  end
+
+  error JWT::MissingRequiredClaim do |error|
+    halt 401, {error: "Token has #{error.to_s.downcase}"}.to_json
+  end
+
   # Handle CORS headers
   before do
     headers "Access-Control-Allow-Origin" => "*",
@@ -38,13 +50,16 @@ class ProxyServer < Sinatra::Base
       # Verify JWT token
       begin
         public_key = OpenSSL::PKey.read(PUBLIC_KEY)
-        @payload = JWT.decode(token, public_key, false, {algorithm: "RS512"})[0]
-
-
-        # Verify token hasn't expired
-        if Time.now.to_i >= @payload["exp"]
-          halt 401, {error: "Token has expired"}.to_json
-        end
+        # JWT.decode returns [payload, headers]
+        @payload, _ = JWT.decode(
+          token,
+          public_key,
+          true, # Verify signature
+          {
+            required_claims: ["exp", "verb", "path", "servers"],
+            algorithm: "RS512"
+          }
+        )
 
         # Verify HTTP method matches
         unless @payload["verb"] == request.request_method
@@ -67,11 +82,6 @@ class ProxyServer < Sinatra::Base
         unless path_matches_pattern?(uri.path, @payload["path"])
           halt 403, {error: "Path not allowed"}.to_json
         end
-
-        JWT.decode(token, public_key, true, {algorithm: "RS512"})[0]
-
-      rescue JWT::DecodeError
-        halt 401, {error: "Invalid token"}.to_json
       end
     end
   end
