@@ -6,8 +6,9 @@ This is a lightweight HTTP proxy server built using the Sinatra framework. It ac
 
 - **CORS Support**: Handles CORS headers, allowing cross-origin requests.
 - **JWT Authentication**: Verifies the presence and validity of the `x-bump-proxy-token` header to ensure requests are authorized.
-- **Flexible HTTP Method Support**: Supports `GET`, `POST`, `PUT`,`PATCH`, and `DELETE` methods for forwarding client requests to the target server.
+- **Flexible HTTP Method Support**: Supports `GET`, `POST`, `PUT`, `PATCH`, and `DELETE` methods for forwarding client requests to the target server.
 - **Automatic Request Forwarding**: Forwards requests to the specified target URL while preserving headers and request bodies.
+- **Path Parameter Support**: Supports dynamic path parameters in URL patterns (e.g., `/posts/{post_id}/comments/{id}`).
 
 ## Getting Started
 
@@ -24,11 +25,13 @@ gem install sinatra jwt
 
 ### Configuration
 
-Use the script to rotate the keys
-  ```bash
-  ./rotate_keys
-  ```
-This will add the keys to the .env file
+Use the script to rotate the JWT signing keys:
+```bash
+./rotate_keys.rb
+```
+This will generate new RSA key pairs and add them to the `.env` file with the following variables:
+- `JWT_SIGNING_PUBLIC_KEY`: Public key for token verification
+- `JWT_SIGNING_PRIVATE_KEY`: Private key for token signing
 
 ### Starting the Server
 
@@ -37,59 +40,75 @@ Run the following command to start the server on port 4567:
 rackup config.ru
 ```
 
-### Run the tests
+### Run the Tests
 
-Run the following command to run the test
+Run the following command to run the test suite:
 ```bash
 RACK_ENV=test bundle exec rspec --color -fd spec/proxy_server_spec.rb
 ```
-
-### Making Requests
-
-- Include the `x-bump-jwt-token` header with a valid JWT in your requests.
-- Ensure the target URL is provided as a query parameter (e.g., `/proxy?url=https://example.com`).
 
 ## Usage
 
 ### Authentication
 
-The server verifies the `x-bump-jwt-token` for every request. If the token is missing or invalid, it returns a `401 Unauthorized` error.
+The server verifies the `x-bump-proxy-token` header for every request. The JWT token must contain the following claims:
 
-### Proxy Endpoints
+- `servers`: Array of allowed target server URLs
+- `verb`: Allowed HTTP method for the request (GET, POST, PUT, PATCH, or DELETE)
+- `path`: Allowed path pattern, supporting path parameters (e.g., `/posts/{post_id}`)
+- `exp`: Token expiration timestamp
 
-The server provides the following endpoints for request forwarding:
+If the token is missing, invalid, or doesn't meet these requirements, the request will be rejected.
 
-- **GET** `/your-target-url`
-- **POST** `?/your-target-url`
-- **PUT** `/your-target-url`
-- **PATCH** `/your-target-url`
-- **DELETE** `/your-target-url`
+### Path Parameters
 
-Each endpoint forwards the request to the target URL specified in the query parameter.
+The server supports dynamic path parameters in URL patterns. For example:
+- Pattern: `/posts/{post_id}/comments/{id}`
+- Valid URL: `/posts/123/comments/456`
 
 ### Example Requests
 
 **GET request:**
 ```bash
-curl -X GET "http://localhost:4567/https://jsonplaceholder.typicode.com/posts" -H "x-bump-jwt-token: YOUR_TOKEN"
+curl -X GET "http://localhost:4567/https://api.example.com/posts" \
+     -H "x-bump-proxy-token: YOUR_JWT_TOKEN"
 ```
 
-**POST request:**
+**POST request with path parameter:**
 ```bash
-curl -X POST "http://localhost:4567/https://jsonplaceholder.typicode.com/posts" \
+curl -X POST "http://localhost:4567/https://api.example.com/posts/123/comments" \
      -H "Content-Type: application/json" \
-     -H "x-bump-jwt-token: YOUR_TOKEN" \
-     -d '{"title":"foo","body":"bar","userId":1}'
+     -H "x-bump-proxy-token: YOUR_JWT_TOKEN" \
+     -d '{"content":"This is a comment"}'
 ```
 
 ### CORS Support
 
-The server includes CORS headers for cross-origin access. Preflight OPTIONS requests are handled by default.
+The server includes the following CORS headers for cross-origin access:
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Methods: OPTIONS, GET, POST, PUT, PATCH, DELETE`
+- `Access-Control-Allow-Headers: Content-Type, Authorization, x-bump-proxy-token, x-requested-with`
+
+Preflight OPTIONS requests are handled automatically.
 
 ## Error Handling
 
-- **401 Unauthorized**: Returned if the `x-bump-jwt-token` header is missing or if the token is invalid.
-- **502 Bad Gateway**: Returned if there is an issue with the target server.
+The server returns different status codes based on various error conditions:
+
+- **401 Unauthorized**:
+  - Missing `x-bump-proxy-token` header
+  - Invalid JWT token
+  - Expired token
+
+- **403 Forbidden**:
+  - HTTP method doesn't match the token's `verb` claim
+  - Target server not in the token's `servers` list
+  - Request path doesn't match the token's `path` pattern
+
+- **502 Bad Gateway**:
+  - Issues communicating with the target server
+
+Each error response includes a JSON body with an `error` field describing the specific error.
 
 ## License
 
