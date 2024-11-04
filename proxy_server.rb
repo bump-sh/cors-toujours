@@ -38,7 +38,38 @@ class ProxyServer < Sinatra::Base
       # Verify JWT token
       begin
         public_key = OpenSSL::PKey.read(PUBLIC_KEY)
-        JWT.decode(token, public_key, true, {algorithm: "RS512"})
+        @payload = JWT.decode(token, public_key, false, {algorithm: "RS512"})[0]
+
+
+        # Verify token hasn't expired
+        if Time.now.to_i >= @payload["exp"]
+          halt 401, {error: "Token has expired"}.to_json
+        end
+
+        # Verify HTTP method matches
+        unless @payload["verb"] == request.request_method
+          halt 403, {error: "HTTP method not allowed"}.to_json
+        end
+
+        # Get target URL from the request
+        target_url = request.fullpath[1..].gsub(":/", "://")
+        uri = URI.parse(target_url)
+
+        # Verify server is allowed
+        # base_url = "#{uri.scheme}://#{uri.host}#{uri.port == uri.default_port ? '' : ":#{uri.port}"}"
+        matching_server = @payload["servers"].find { |server| target_url.to_s.include?(server) }
+
+        unless matching_server
+          halt 403, {error: "Server not allowed"}.to_json
+        end
+
+        # Verify path matches the pattern
+        unless path_matches_pattern?(uri.path, @payload["path"])
+          halt 403, {error: "Path not allowed"}.to_json
+        end
+
+        JWT.decode(token, public_key, true, {algorithm: "RS512"})[0]
+
       rescue JWT::DecodeError
         halt 401, {error: "Invalid token"}.to_json
       end
@@ -51,8 +82,18 @@ class ProxyServer < Sinatra::Base
   end
 
   helpers do
+    def path_matches_pattern?(actual_path, pattern_path)
+      # Convert pattern with {param} to regex
+      # e.g., "/docs/{doc_id}/branches/{slug}" becomes /^\/docs\/[^\/]+\/branches\/[^\/]+$/
+      pattern_regex = pattern_path.gsub(/\{[^}]+\}/, '[^/]+')
+      pattern_regex = "^#{pattern_regex}$"
+
+      # Match the actual path against the regex
+      Regexp.new(pattern_regex).match?(actual_path)
+    end
+
     def forward_request(method)
-      target_url = params["splat"][0].gsub(":/", "://")
+      target_url = request.fullpath[1..].gsub(":/", "://")
       uri = URI.parse(target_url)
 
       # Set up the request to the target server
