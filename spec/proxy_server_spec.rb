@@ -1,3 +1,5 @@
+ENV["RACK_ENV"] ||= "test"
+
 require "rspec"
 require "rack/test"
 require "webmock/rspec"
@@ -148,21 +150,45 @@ describe "ProxyServer" do
     describe  "Token Payload" do
       context "when token is expired" do
         let(:exp) { Time.now.to_i - 500 } # 5 minutes ago
-  
+
         before(:each) do
           header "x-bump-proxy-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
-  
+
         it "returns 401" do
           expect(last_response.status).to eq(401)
         end
-  
+
         it "has error message" do
           expect_json_body("error", "Token has expired")
         end
-  
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when token has a missing claim" do
+        let(:payload) do
+          {}
+        end
+
+        before(:each) do
+          header "x-bump-proxy-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 401" do
+          expect(last_response.status).to eq(401)
+        end
+
+        it "has error message" do
+          expect_json_body("error", "Token has missing required claim exp")
+        end
+
         it "returns cors headers" do
           expect_header("access-control-allow-origin", "*")
         end
