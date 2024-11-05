@@ -62,6 +62,17 @@ describe "ProxyServer" do
       .to_return(status: 200, body: {title: "updated title"}.to_json, headers: {})
     stub_request(:post, "https://jsonplaceholder.typicode.com/posts")
       .to_return(status: 201, body: {title: "foo", body: "bar", userId: 1}.to_json, headers: {})
+    stub_request(:get, "https://staging.bump.sh/api/v1/ping")
+      .with(
+        headers: {
+        'Accept'=>'*/*',
+        'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        'Cookie'=>'',
+        'Host'=>'staging.bump.sh',
+        'User-Agent'=>'Ruby',
+        'X-Foo'=>'bar'
+        })
+      .to_return(status: 200, body: "", headers: {})
   end
 
   context "preflight request" do
@@ -85,6 +96,28 @@ describe "ProxyServer" do
 
         it "returns 200" do
           expect(last_response.status).to eq(200)
+        end
+
+        context "when server contains some path like /api/v1" do
+
+          let(:payload) do
+            {
+              "servers": [
+                "https://staging.bump.sh/api/v1",
+                "http://localhost:3000/api/v1",
+                "https://bump.sh/api/v1"
+              ],
+              "verb": "GET",
+              "path": "/ping",
+              "exp": Time.now.to_i + 500
+            }
+          end
+
+          let(:target_url) { "https://staging.bump.sh/api/v1/ping"}
+
+          it "returns 200" do
+            expect(last_response.status).to eq(200)
+          end
         end
 
         it "returns cors headers" do
