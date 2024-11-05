@@ -68,18 +68,16 @@ class ProxyServer < Sinatra::Base
 
         # Get target URL from the request
         target_url = request.fullpath[1..].gsub(":/", "://")
-        uri = URI.parse(target_url)
 
         # Verify server is allowed
-        # base_url = "#{uri.scheme}://#{uri.host}#{uri.port == uri.default_port ? '' : ":#{uri.port}"}"
-        matching_server = @payload["servers"].find { |server| target_url.to_s.include?(server) }
+        matching_server = @payload["servers"].find { |server| target_url.to_s.include?(server) }&.gsub(/\/$/, "")
 
         unless matching_server
           halt 403, {error: "Server not allowed"}.to_json
         end
 
         # Verify path matches the pattern
-        unless path_matches_pattern?(uri.path, @payload["path"])
+        unless path_matches_pattern?(path_from_target_url(target_url, matching_server), @payload["path"])
           halt 403, {error: "Path not allowed"}.to_json
         end
       end
@@ -92,6 +90,10 @@ class ProxyServer < Sinatra::Base
   end
 
   helpers do
+    def path_from_target_url(target_url, matching_server)
+      target_url.gsub(/^#{matching_server}/, "")
+    end
+
     def path_matches_pattern?(actual_path, pattern_path)
       # Convert pattern with {param} to regex
       # e.g., "/docs/{doc_id}/branches/{slug}" becomes /^\/docs\/[^\/]+\/branches\/[^\/]+$/
