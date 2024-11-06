@@ -70,7 +70,7 @@ class ProxyServer < Sinatra::Base
         target_url = request.fullpath[1..].gsub(":/", "://")
 
         # Verify server is allowed
-        matching_server = @payload["servers"].find { |server| target_url.to_s.include?(server) }&.gsub(/\/$/, "")
+        matching_server = @payload["servers"].find { |server| target_url.to_s.start_with?(/^#{server}/) }&.chomp("/")
 
         unless matching_server
           halt 403, {error: "Server not allowed"}.to_json
