@@ -14,13 +14,12 @@ This is a lightweight HTTP proxy server built using the Sinatra framework. It ac
 
 ### Prerequisites
 
-- Ruby (>= 2.7)
-- Sinatra gem (`sinatra`)
-- JWT gem (`jwt`)
+- Ruby (>= 3.0)
+- Bundler
 
 Install the required gems:
 ```bash
-gem install sinatra jwt
+bundle install
 ```
 
 ### Configuration
@@ -32,19 +31,21 @@ Use the script to rotate the JWT signing keys:
 This will generate new RSA key pairs and add them to the `.env` file with the following variables:
 - `JWT_SIGNING_PUBLIC_KEY`: Public key for token verification
 - `JWT_SIGNING_PRIVATE_KEY`: Private key for token signing
+For the first launch the script will add the necessary keys to the .env file.
+If later on you need to rotate the keys you will need to remove them manually from the .env file before exectuting the script again.
 
-### Starting the Server
+### Starting the Server Locally
 
 Run the following command to start the server on port 4567:
 ```bash
-rackup config.ru
+bundle exec puma
 ```
 
 ### Run the Tests
 
 Run the following command to run the test suite:
 ```bash
-RACK_ENV=test bundle exec rspec --color -fd spec/proxy_server_spec.rb
+bundle exec rspec --color -fd spec
 ```
 
 ## Usage
@@ -70,16 +71,16 @@ The server supports dynamic path parameters in URL patterns. For example:
 
 **GET request:**
 ```bash
-curl -X GET "http://localhost:4567/https://api.example.com/posts" \
+curl -X GET "http://localhost:4567/https://jsonplaceholder.typicode.com/todos" \
      -H "x-bump-proxy-token: YOUR_JWT_TOKEN"
 ```
 
-**POST request with path parameter:**
+**PATCH request:**
 ```bash
-curl -X POST "http://localhost:4567/https://api.example.com/posts/123/comments" \
+curl -X PATCH "http://localhost:4567/https://jsonplaceholder.typicode.com/posts/1" \
      -H "Content-Type: application/json" \
      -H "x-bump-proxy-token: YOUR_JWT_TOKEN" \
-     -d '{"content":"This is a comment"}'
+     -d '{"title":"foo"}'
 ```
 
 ### CORS Support
