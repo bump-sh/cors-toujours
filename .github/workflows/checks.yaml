@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+jobs:
+  tests:
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Rotate Keys
+        run: |
+          touch ./.env
+          chmod +x ./rotate_keys.rb
+          ./rotate_keys.rb
+        shell: bash
+      - name: Run RSpec tests
+        run: bundle exec rspec spec
