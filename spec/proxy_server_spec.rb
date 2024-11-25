@@ -64,14 +64,17 @@ describe "ProxyServer" do
       .to_return(status: 201, body: {title: "foo", body: "bar", userId: 1}.to_json, headers: {})
     ["https://staging.bump.sh/api/v1/ping", "https://bump.sh/api/Custom+Api/v1/ping"].each do |server|
       stub_request(:get, server)
-        .with(headers: {
+        .with(
+          headers: {
             'Accept' => '*/*',
             'Accept-Encoding' => 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
-            'Cookie'=>'',
-            'Host'=> URI.parse(server).host,
-            'User-Agent'=>'Ruby',
-            'X-Foo'=>'bar'
-          })
+            'Cookie' => '',
+            'Host' => URI.parse(server).host,
+            'User-Agent' => 'Ruby',
+            'X-Foo' => 'bar'
+          },
+          query: hash_including # Allow any query parameters
+        )
         .to_return(status: 200, body: "", headers: {})
     end
   end
@@ -137,6 +140,14 @@ describe "ProxyServer" do
               expect(last_response.status).to eq(200)
             end
           end
+
+          context "when target path has query parameters" do
+            let(:target_url) { "https://staging.bump.sh/api/v1/ping?date=2025-01-01&expired=false" }
+
+            it "returns 200" do
+              expect(last_response.status).to eq(200)
+            end
+          end
         end
 
         it "returns cors headers" do
@@ -176,8 +187,6 @@ describe "ProxyServer" do
           expect_header("access-control-allow-origin", "*")
         end
       end
-
-
     end
 
     context "but is invalid" do
