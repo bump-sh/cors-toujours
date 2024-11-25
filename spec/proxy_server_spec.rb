@@ -384,4 +384,43 @@ describe "ProxyServer" do
       end
     end
   end
+
+  context "startup of ProxyServer" do
+    def load_config(writer, config)
+      fork do
+        begin
+          stub_const('ENV', config)
+          load File.expand_path("./proxy_server.rb"), true
+          writer.write "success!\n"
+        rescue
+          writer.write "fail: #{$!.message}\n"
+        end
+        writer.close
+      end
+    end
+
+    context "with an incorrect configuration" do
+      it "should raise an error" do
+        # IO.pipe is used to share data between the forked processes
+        rd, writer = IO.pipe
+        load_config(writer, { 'JWT_SIGNING_PUBLIC_KEY' => 'OUPS-INCORRECT' })
+        writer.close
+
+        expect(rd.read).to eq("fail: Could not parse PKey\n")
+      end
+    end
+
+    context "with an correct configuration" do
+      it "should load without any error" do
+        # IO.pipe is used to share data between the forked processes
+        rd, writer = IO.pipe
+        rsa_key = OpenSSL::PKey::RSA.new(2048)
+        load_config(writer, { 'JWT_SIGNING_PUBLIC_KEY' => rsa_key.public_key.to_pem })
+        writer.close
+
+        expect(rd.read).to eq("success!\n")
+      end
+    end
+  end
+
 end
