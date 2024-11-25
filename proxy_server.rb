@@ -68,7 +68,7 @@ class ProxyServer < Sinatra::Base
         end
 
         # Get target URL from the request
-        target_url = request.fullpath[1..].gsub(":/", "://")
+        target_url = request.path[1..].gsub(":/", "://")
 
         # Verify server is allowed
         matching_server = @payload["servers"].find { |server| target_url.to_s.start_with?(server) }&.chomp("/")
