@@ -15,7 +15,9 @@ class ProxyServer < Sinatra::Base
   # set :logging, true
 
   # Secret key for JWT verification
-  PUBLIC_KEY = ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
+  PUBLIC_KEY = OpenSSL::PKey.read(
+    ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
+  ).freeze
 
   error JWT::ExpiredSignature do
     halt 401, {error: "Token has expired"}.to_json
@@ -49,11 +51,10 @@ class ProxyServer < Sinatra::Base
 
       # Verify JWT token
       begin
-        public_key = OpenSSL::PKey.read(PUBLIC_KEY)
         # JWT.decode returns [payload, headers]
         @payload, _ = JWT.decode(
           token,
-          public_key,
+          ::ProxyServer::PUBLIC_KEY,
           true, # Verify signature
           {
             required_claims: ["exp", "verb", "path", "servers"],
