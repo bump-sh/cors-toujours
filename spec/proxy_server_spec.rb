@@ -52,31 +52,10 @@ describe "ProxyServer" do
 
   let(:target_url) { "https://jsonplaceholder.typicode.com/posts" }
 
-  # Mock external requests with WebMock or a similar tool (if desired)
-
   before(:each) do
     stub_request(:get, "https://jsonplaceholder.typicode.com/posts")
       .with(headers: {"x-foo": "bar"})
       .to_return(status: 200, body: "", headers: {})
-    stub_request(:put, "https://jsonplaceholder.typicode.com/posts/1")
-      .to_return(status: 200, body: {title: "updated title"}.to_json, headers: {})
-    stub_request(:post, "https://jsonplaceholder.typicode.com/posts")
-      .to_return(status: 201, body: {title: "foo", body: "bar", userId: 1}.to_json, headers: {})
-    ["https://staging.bump.sh/api/v1/ping", "https://bump.sh/api/Custom+Api/v1/ping"].each do |server|
-      stub_request(:get, server)
-        .with(
-          headers: {
-            'Accept' => '*/*',
-            'Accept-Encoding' => 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
-            'Cookie' => '',
-            'Host' => URI.parse(server).host,
-            'User-Agent' => 'Ruby',
-            'X-Foo' => 'bar'
-          },
-          query: hash_including # Allow any query parameters
-        )
-        .to_return(status: 200, body: "", headers: {})
-    end
   end
 
   context "preflight request" do
@@ -93,6 +72,21 @@ describe "ProxyServer" do
     context "and is valid" do
       context "when no path params" do
         before(:each) do
+          ["https://staging.bump.sh/api/v1/ping", "https://bump.sh/api/Custom+Api/v1/ping"].each do |server|
+            stub_request(:get, server)
+              .with(
+                headers: {
+                  'Accept' => '*/*',
+                  'Accept-Encoding' => 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+                  'Cookie' => '',
+                  'Host' => URI.parse(server).host,
+                  'User-Agent' => 'Ruby',
+                  'X-Foo' => 'bar'
+                },
+                query: hash_including # Allow any query parameters
+              )
+              .to_return(status: 200, body: "", headers: {})
+          end
           header "x-bump-proxy-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
@@ -185,6 +179,61 @@ describe "ProxyServer" do
 
         it "returns cors headers" do
           expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when POST requests" do
+        let(:verb) { "POST" }
+        let(:request_body) { {title: "foo", body: "bar", userId: 1} }
+
+        before(:each) do
+          stub_request(:post, "https://jsonplaceholder.typicode.com/posts")
+            .to_return(status: 201, body: {title: "foo", body: "bar", userId: 1}.to_json, headers: {})
+          header "x-bump-proxy-token", proxy_token
+          header "Content-Type", "application/json"
+          post "/#{target_url}", request_body.to_json
+        end
+
+        it "returns a 201 Created status" do
+          expect(last_response.status).to eq(201)
+        end
+
+        it "includes CORS headers in the response" do
+          expect_header("access-control-allow-origin", "*")
+        end
+
+        it "returns the correct title in the response body" do
+          response_body = JSON.parse(last_response.body)
+          expect(response_body["title"]).to eq("foo")
+        end
+
+        it "returns the correct body in the response body" do
+          response_body = JSON.parse(last_response.body)
+          expect(response_body["body"]).to eq("bar")
+        end
+
+        it "returns the correct userId in the response body" do
+          response_body = JSON.parse(last_response.body)
+          expect(response_body["userId"]).to eq(1)
+        end
+      end
+
+      context "when PUT requests" do
+        let(:verb) { "PUT" }
+        let(:path) { "/posts/{id}" }
+
+        before(:each) do
+          stub_request(:put, "https://jsonplaceholder.typicode.com/posts/1")
+            .to_return(status: 200, body: {title: "updated title"}.to_json, headers: {})
+          header "x-bump-proxy-token", proxy_token
+          header "Content-Type", "application/json"
+          put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
+        end
+
+        it "forwards headers and body for PUT requests" do
+          expect(last_response.status).to eq(200)  # Expect OK status if target server responds as expected
+          response_body = JSON.parse(last_response.body)
+          expect(response_body["title"]).to eq("updated title")
         end
       end
 
@@ -364,56 +413,6 @@ describe "ProxyServer" do
   end
 
   context "request forwarding" do
-    context "when POST requests" do
-      let(:verb) { "POST" }
-      let(:request_body) { {title: "foo", body: "bar", userId: 1} }
-
-      before(:each) do
-        header "x-bump-proxy-token", proxy_token
-        header "Content-Type", "application/json"
-        post "/#{target_url}", request_body.to_json
-      end
-
-      it "returns a 201 Created status" do
-        expect(last_response.status).to eq(201)
-      end
-
-      it "includes CORS headers in the response" do
-        expect_header("access-control-allow-origin", "*")
-      end
-
-      it "returns the correct title in the response body" do
-        response_body = JSON.parse(last_response.body)
-        expect(response_body["title"]).to eq("foo")
-      end
-
-      it "returns the correct body in the response body" do
-        response_body = JSON.parse(last_response.body)
-        expect(response_body["body"]).to eq("bar")
-      end
-
-      it "returns the correct userId in the response body" do
-        response_body = JSON.parse(last_response.body)
-        expect(response_body["userId"]).to eq(1)
-      end
-    end
-
-    context "when PUT requests" do
-      let(:verb) { "PUT" }
-      let(:path) { "/posts/{id}" }
-
-      before(:each) do
-        header "x-bump-proxy-token", proxy_token
-        header "Content-Type", "application/json"
-        put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
-      end
-
-      it "forwards headers and body for PUT requests" do
-        expect(last_response.status).to eq(200)  # Expect OK status if target server responds as expected
-        response_body = JSON.parse(last_response.body)
-        expect(response_body["title"]).to eq("updated title")
-      end
-    end
   end
 
   context "startup of ProxyServer" do
