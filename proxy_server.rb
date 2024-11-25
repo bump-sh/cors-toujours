@@ -20,18 +20,22 @@ class ProxyServer < Sinatra::Base
   ).freeze
 
   error JWT::ExpiredSignature do
+    headers "Content-Type" => "application/json"
     halt 401, {error: "Token has expired"}.to_json
   end
 
   error JWT::DecodeError do
+    headers "Content-Type" => "application/json"
     halt 401, {error: "Invalid token"}.to_json
   end
 
   error JWT::MissingRequiredClaim do |error|
+    headers "Content-Type" => "application/json"
     halt 401, {error: "Token has #{error.to_s.downcase}"}.to_json
   end
 
   error do |error|
+    headers "Content-Type" => "application/json"
     halt 502, {error: error.message}.to_json
   end
 
