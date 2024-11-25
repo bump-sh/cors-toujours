@@ -13,7 +13,7 @@ describe "ProxyServer" do
   include Rack::Test::Methods
 
   def app
-    ProxyServer
+    @app ||= ProxyServer
   end
 
   def expect_header(k, v)
@@ -185,6 +185,28 @@ describe "ProxyServer" do
 
         it "returns cors headers" do
           expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when target request returns an error" do
+        before(:each) do
+          # This sinatra config setting simulates the production
+          # behavior (because in dev/test the generic error handler is
+          # not called, instead errors are raised for real)
+          @app = Sinatra.new(ProxyServer) do
+            set :raise_errors, false
+          end
+          stub_request(:get, "https://jsonplaceholder.typicode.com/posts")
+            .to_raise(OpenSSL::SSL::SSLError)
+          header "x-bump-proxy-token", proxy_token
+          header "Content-Type", "application/json"
+          get "/#{target_url}"
+        end
+
+        it "returns a 502 and forwards the error message" do
+          expect(last_response.status).to eq(502)
+          response_body = JSON.parse(last_response.body)
+          expect(response_body["error"]).to eq("Exception from WebMock")
         end
       end
     end

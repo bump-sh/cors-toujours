@@ -31,6 +31,10 @@ class ProxyServer < Sinatra::Base
     halt 401, {error: "Token has #{error.to_s.downcase}"}.to_json
   end
 
+  error do |error|
+    halt 502, {error: error.message}.to_json
+  end
+
   # Handle CORS headers
   before do
     headers "Access-Control-Allow-Origin" => "*",
