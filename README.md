@@ -113,7 +113,7 @@ Each error response includes a JSON body with an `error` field describing the sp
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the AGPL License.
 
 ## Contributing
 
