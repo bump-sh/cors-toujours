@@ -16,7 +16,7 @@ puts private_key
 
 # Display the public key in PEM format
 puts "\nPublic Key:"
-public_key =  rsa_key.public_key.to_pem
+public_key = rsa_key.public_key.to_pem
 puts public_key
 `echo 'JWT_SIGNING_PUBLIC_KEY="#{public_key}"' >> ./.env`
 

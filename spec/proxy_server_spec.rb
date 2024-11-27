@@ -68,7 +68,7 @@ describe "ProxyServer" do
     end
   end
 
-  context "when x-bump-jwt-token is present" do
+  context "when x-cors-toujours-token is present" do
     context "and is valid" do
       context "when no path params" do
         before(:each) do
@@ -87,13 +87,30 @@ describe "ProxyServer" do
               )
               .to_return(status: 200, body: "", headers: {})
           end
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
 
         it "returns 200" do
           expect(last_response.status).to eq(200)
+        end
+
+        context "when header name is changed via configuration" do
+          before(:each) do
+            stub_const('ProxyServer::TOKEN_HEADER', "x-custom-proxy")
+
+            # Replace token header with newly configured header name
+            header "x-cors-toujours-token", nil
+            header "x-custom_proxy", proxy_token
+
+            # Send a new request
+            get "/#{target_url}"
+          end
+
+          it "returns 200" do
+            expect(last_response.status).to eq(200)
+          end
         end
 
         context "when server contains some path like /api/v1" do
@@ -166,7 +183,7 @@ describe "ProxyServer" do
               })
             .to_return(status: 200, body: "", headers: {})
 
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
 
@@ -189,7 +206,7 @@ describe "ProxyServer" do
         before(:each) do
           stub_request(:post, "https://jsonplaceholder.typicode.com/posts")
             .to_return(status: 201, body: {title: "foo", body: "bar", userId: 1}.to_json, headers: {})
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "Content-Type", "application/json"
           post "/#{target_url}", request_body.to_json
         end
@@ -225,7 +242,7 @@ describe "ProxyServer" do
         before(:each) do
           stub_request(:put, "https://jsonplaceholder.typicode.com/posts/1")
             .to_return(status: 200, body: {title: "updated title"}.to_json, headers: {})
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "Content-Type", "application/json"
           put "/#{target_url}/1", {id: 1, title: "updated title"}.to_json
         end
@@ -247,7 +264,7 @@ describe "ProxyServer" do
           end
           stub_request(:get, "https://jsonplaceholder.typicode.com/posts")
             .to_raise(OpenSSL::SSL::SSLError)
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "Content-Type", "application/json"
           get "/#{target_url}"
         end
@@ -262,7 +279,7 @@ describe "ProxyServer" do
 
     context "but is invalid" do
       before(:each) do
-          header "x-bump-proxy-token", invalid_proxy_token
+          header "x-cors-toujours-token", invalid_proxy_token
           get "/#{target_url}"
         end
 
@@ -284,7 +301,7 @@ describe "ProxyServer" do
         let(:exp) { Time.now.to_i - 500 } # 5 minutes ago
 
         before(:each) do
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
@@ -308,7 +325,7 @@ describe "ProxyServer" do
         end
 
         before(:each) do
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
@@ -330,7 +347,7 @@ describe "ProxyServer" do
         let(:verb) { "PATCH" } # wrong http method
 
         before(:each) do
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
@@ -352,7 +369,7 @@ describe "ProxyServer" do
         let(:servers) { ["https://staging.bump.sh/api/v1/"] }
 
         before(:each) do
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
@@ -374,7 +391,7 @@ describe "ProxyServer" do
         let(:path) { "/comments" }
 
         before(:each) do
-          header "x-bump-proxy-token", proxy_token
+          header "x-cors-toujours-token", proxy_token
           header "x-foo", "bar"
           get "/#{target_url}"
         end
@@ -394,7 +411,7 @@ describe "ProxyServer" do
     end
   end
 
-  context "when x-bump-proxy-token is missing" do
+  context "when x-cors-toujours-token is missing" do
     before(:each) do
         get "/#{target_url}"
       end
@@ -408,7 +425,7 @@ describe "ProxyServer" do
     end
 
     it "returns the correct error message in the response body" do
-      expect(JSON.parse(last_response.body)["error"]).to eq("x-bump-proxy-token header is missing")
+      expect(JSON.parse(last_response.body)["error"]).to eq("x-cors-toujours-token header is missing")
     end
   end
 

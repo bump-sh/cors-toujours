@@ -19,6 +19,11 @@ class ProxyServer < Sinatra::Base
     ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
   ).freeze
 
+  TOKEN_HEADER = ENV.fetch(
+    "CORS_TOUJOURS_TOKEN_HEADER_NAME",
+    "x-cors-toujours-token"
+  ).split("_").join("-").downcase.freeze
+
   error JWT::ExpiredSignature do
     headers "Content-Type" => "application/json"
     halt 401, {error: "Token has expired"}.to_json
@@ -43,18 +48,19 @@ class ProxyServer < Sinatra::Base
   before do
     headers "Access-Control-Allow-Origin" => "*",
       "Access-Control-Allow-Methods" => ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
-      "Access-Control-Allow-Headers" => "Content-Type, Authorization, x-bump-proxy-token, x-requested-with"
+      "Access-Control-Allow-Headers" => "Content-Type, Authorization, #{::ProxyServer::TOKEN_HEADER}, x-requested-with"
   end
 
   # Verify JWT token presence and signature
   before do
     if request.env["REQUEST_METHOD"] != "OPTIONS"
-      token = request.env["HTTP_X_BUMP_PROXY_TOKEN"]
+      token_header = ::ProxyServer::TOKEN_HEADER.split("-").join("_").upcase
+      token = request.get_header("HTTP_#{token_header}")
 
       # Check if token is missing
       if token.nil?
         headers "Content-Type" => "application/json"
-        halt 401, {error: "x-bump-proxy-token header is missing"}.to_json
+        halt 401, {error: "#{::ProxyServer::TOKEN_HEADER} header is missing"}.to_json
       end
 
       # Verify JWT token
@@ -128,10 +134,13 @@ class ProxyServer < Sinatra::Base
         end
 
       # Transfer relevant headers from the client to the target request
-      client_headers = request.env.select { |key, _| key.start_with?("HTTP_") }
-      client_headers.each do |header, value|
+      request.each_header do |header, value|
         formatted_header = header.sub("HTTP_", "").split("_").map(&:capitalize).join("-")
-        target_request[formatted_header] = value unless formatted_header == "X-Bump-Proxy-Token"
+
+        next unless header.start_with?("HTTP_")
+        next if formatted_header.downcase == ::ProxyServer::TOKEN_HEADER
+
+        target_request[formatted_header] = value
       end
 
       # Forward request body for POST, PUT and PATCH methods
