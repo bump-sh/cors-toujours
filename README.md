@@ -70,14 +70,14 @@ The server verifies the `x-cors-toujours-token` header for every request (name o
 - `path`: Allowed path pattern, supporting path parameters (e.g., `/posts/{post_id}`)
 - `exp`: Token expiration timestamp
 
-E.g.: A client sending a request to `POST https://bump.sh/api/v1/ping`
+E.g.: A client sending a request to `GET https://bump.sh/api/v1/ping`
 via the proxy will need to include an encoded JWT token in
 the `x-cors-toujours-token` header, whose decoded value would look like:
 ```json
 {
   "servers": ["https://bump.sh"],
   "path": "/api/v1/ping",
-  "verb": "POST",
+  "verb": "GET",
   "exp": "2025-01-01T00:00:00Z"
 }
 ```
