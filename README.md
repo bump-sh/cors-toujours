@@ -2,6 +2,8 @@
 
 This is a lightweight HTTP proxy server built using the Sinatra framework. It acts as a pass-through proxy, allowing requests to be forwarded to a specified target URL. Additionally, it provides a JWT (JSON Web Token) verification mechanism to allow only specific requests.
 
+Powered and used in production by [Bump.sh](https://bump.sh)
+
 ## Features
 
 - **CORS Support**: Handles CORS headers, allowing cross-origin requests.
