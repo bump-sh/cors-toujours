@@ -37,7 +37,7 @@ Use the following script to create your first JWT signing keys:
 
 This will generate a RSA key pair and add it to the `.env` file with the following variables:
 - `JWT_SIGNING_PUBLIC_KEY`: Public key for token verification (used by the proxy)
-- `JWT_SIGNING_PRIVATE_KEY`: Private key for token signing (used by clients making the requests)
+- `JWT_SIGNING_PRIVATE_KEY`: Private key for token signing (used by the server exposing a web HTTP client allowing only specific requests)
 
 If later on you need to rotate the keys you will need to remove them manually from the .env file before exectuting the script again.
 
