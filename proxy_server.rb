@@ -19,6 +19,15 @@ class ProxyServer < Sinatra::Base
     ENV.fetch("JWT_SIGNING_PUBLIC_KEY").gsub("\\n", "\n")
   ).freeze
 
+  # Remove some headers from proxied requests.
+  HEADERS_SKIP_FORWARD = [
+    "set-cookie", # Don't forward authenticated cookies data
+    "transfer-encoding" # Don't forward transfer-encoding as this is a
+                        # “hop-by-hop” header which needs to be
+                        # consumed by the proxy when reading the
+                        # target response.
+  ].freeze
+
   TOKEN_HEADER = ENV.fetch(
     "CORS_TOUJOURS_TOKEN_HEADER_NAME",
     "x-cors-toujours-token"
@@ -119,6 +128,12 @@ class ProxyServer < Sinatra::Base
       Regexp.new(pattern_regex).match?(actual_path)
     end
 
+    def skip_header?(key)
+      HEADERS_SKIP_FORWARD.any? do |header|
+        key.downcase.start_with?(header)
+      end
+    end
+
     def forward_request(method)
       target_url = request.fullpath[1..].gsub(":/", "://")
       uri = URI.parse(target_url)
@@ -160,18 +175,29 @@ class ProxyServer < Sinatra::Base
 
       # Execute the request to the target server
       Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
+        # This has the effect to .read the response body directly. In
+        # case we want to stream the response we might want to use a
+        # block with http.request(..) do |response| at some
+        # point. Especially when we will want to proxy file download
+        # requests.
         response = http.request(target_request)
 
-        # Pass the target server response back to the client
-        status response.code
-        headers "Content-Type" => response.content_type
+        # Forward the raw target response back to the client.
 
-        content_encoding = response.get_fields "content-encoding"
-        if content_encoding && content_encoding.include?("gzip")
-          body Zlib::GzipReader.new(StringIO.new(response.body)).read
-        else
-          body response.body
+        # RESPONSE CODE
+        status response.code
+
+        forwarded_headers = {}
+        response.each_header do |key, value|
+          next if skip_header?(key)
+
+          forwarded_headers[key] = value
         end
+        # RESPONSE HEADERS
+        headers forwarded_headers
+
+        # RESPONSE BODY
+        body response.body
       end
     end
   end
