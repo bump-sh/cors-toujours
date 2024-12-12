@@ -55,7 +55,15 @@ describe "ProxyServer" do
   before(:each) do
     stub_request(:get, "https://jsonplaceholder.typicode.com/posts")
       .with(headers: {"x-foo": "bar"})
-      .to_return(status: 200, body: "", headers: {})
+      .to_return(
+        status: 200,
+        body: "",
+        headers: {
+          "X-Target-Resp-Header": "Custom",
+          "Set-Cookie": "session=remove",
+          "Transfer-Encoding": "chunked"
+        }
+      )
   end
 
   context "preflight request" do
@@ -94,6 +102,12 @@ describe "ProxyServer" do
 
         it "returns 200" do
           expect(last_response.status).to eq(200)
+        end
+
+        it "fowards most headers but skips cookies and transfer encoding" do
+          expect(last_response["X-Target-Resp-Header"]).to eq("Custom")
+          expect(last_response["Set-Cookie"]).to be_nil
+          expect(last_response["Transfer-Encoding"]).to be_nil
         end
 
         context "when header name is changed via configuration" do
