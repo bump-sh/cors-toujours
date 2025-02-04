@@ -53,11 +53,21 @@ class ProxyServer < Sinatra::Base
     halt 502, {error: error.message}.to_json
   end
 
-  # Handle CORS headers
+  # Add CORS headers to the response
   before do
-    headers "Access-Control-Allow-Origin" => "*",
-      "Access-Control-Allow-Methods" => ["OPTIONS", "GET", "POST", "PUT", "PATCH", "DELETE"],
-      "Access-Control-Allow-Headers" => "Content-Type, Authorization, #{::ProxyServer::TOKEN_HEADER}, x-requested-with"
+    headers "Access-Control-Allow-Origin" => "*"
+
+    original_request_method = request.get_header("HTTP_ACCESS_CONTROL_REQUEST_METHOD")
+    original_request_headers = request.get_header("HTTP_ACCESS_CONTROL_REQUEST_HEADERS")
+
+    if (original_request_method)
+      headers "Access-Control-Allow-Methods" => original_request_method
+      request.delete_header("HTTP_ACCESS_CONTROL_REQUEST_METHOD")
+    end
+    if (original_request_headers)
+      headers "Access-Control-Allow-Headers" => original_request_headers
+      request.delete_header("HTTP_ACCESS_CONTROL_REQUEST_HEADERS")
+    end
   end
 
   # Verify JWT token presence and signature
