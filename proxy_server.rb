@@ -171,6 +171,12 @@ class ProxyServer < Sinatra::Base
       # Forward request body for POST, PUT and PATCH methods
       if !%w[GET HEAD OPTIONS].include?(method) && request.body && request.content_type
         target_request.content_type = request.content_type
+        # Make sure the request body is rewinded so we can read it.
+        # in case it has already been read, e.g. for
+        # `request.form_data?` whihch is requests with content type
+        # application/x-www-form-urlencoded, the body is already read
+        # by Rack::Request.
+        request.body.rewind
         target_request.body = request.body.read
       end
 
