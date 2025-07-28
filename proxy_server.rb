@@ -104,14 +104,28 @@ class ProxyServer < Sinatra::Base
         target_url = request.path[1..].gsub(":/", "://")
 
         # Verify server is allowed
-        matching_server = @payload["servers"].find { |server| target_url.to_s.start_with?(server) }&.chomp("/")
+        matching_regexp_server = @payload["servers"].map do |server|
+          # Replace server variables with wild cards
+          regexp_server = Regexp.escape(server).gsub(/\\\{[^}]+\\\}/, ".*")
+          regexp_server.chomp("/")
+        end.find do |server|
+          _scheme, rest = server.split("://")
+          domain = rest.split("/").first
+          domain_fragments = domain.split("\\.")
 
-        unless matching_server
+          # make sure there's a valid domain in the server (not a wildcard domain)
+          domain_fragments.size >= 2 &&
+            domain_fragments.last(2).none? { |el| el.include?(".*") } &&
+            # And that target URL starts with server
+            target_url.to_s.start_with?(/#{server}/)
+        end
+
+        unless matching_regexp_server
           halt 403, {error: "Server not allowed"}.to_json
         end
 
         # Verify path matches the pattern
-        unless path_matches_pattern?(path_from_target_url(target_url, matching_server), @payload["path"])
+        unless path_matches_pattern?(path_from_target_url(target_url, matching_regexp_server), @payload["path"])
           halt 403, {error: "Path not allowed"}.to_json
         end
       end
@@ -124,8 +138,8 @@ class ProxyServer < Sinatra::Base
   end
 
   helpers do
-    def path_from_target_url(target_url, matching_server)
-      target_url.gsub(/^#{Regexp.escape(matching_server)}/, "")
+    def path_from_target_url(target_url, matching_regexp_server)
+      target_url.gsub(/^#{matching_regexp_server}/, "")
     end
 
     def path_matches_pattern?(actual_path, pattern_path)

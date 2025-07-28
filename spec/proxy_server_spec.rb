@@ -173,6 +173,44 @@ describe "ProxyServer" do
               expect(last_response.status).to eq(200)
             end
           end
+
+          context "when server contains OAI server variables in the domain" do
+            let(:payload) do
+              {
+                "servers": [
+                  "https://{namespace}.bump.sh/api/v1"
+                ],
+                "verb": "GET",
+                "path": "/ping",
+                "exp": Time.now.to_i + 500
+              }
+            end
+
+            let(:target_url) { "https://staging.bump.sh/api/v1/ping"}
+
+            it "returns 200" do
+              expect(last_response.status).to eq(200)
+            end
+          end
+
+          context "when server contains OAI server variables in the path" do
+            let(:payload) do
+              {
+                "servers": [
+                  "https://bump.sh/{context}/Custom+Api/v1"
+                ],
+                "verb": "GET",
+                "path": "/ping",
+                "exp": Time.now.to_i + 500
+              }
+            end
+
+            let(:target_url) { "https://bump.sh/api/Custom+Api/v1/ping"}
+
+            it "returns 200" do
+              expect(last_response.status).to eq(200)
+            end
+          end
         end
 
         it "returns cors headers" do
@@ -401,7 +439,34 @@ describe "ProxyServer" do
         end
       end
 
-      context "when is not allowed" do
+      context "when server contains wrongly placed server variables" do
+        let(:servers) do
+          [
+            "https://jsonplaceholder.{domain}com/",
+            "https://jsonplaceholder.{domain}.com/"
+          ]
+        end
+
+        before(:each) do
+          header "x-cors-toujours-token", proxy_token
+          header "x-foo", "bar"
+          get "/#{target_url}"
+        end
+
+        it "returns 403" do
+          expect(last_response.status).to eq(403)
+        end
+
+        it "has error message" do
+          expect_json_body("error", "Server not allowed")
+        end
+
+        it "returns cors headers" do
+          expect_header("access-control-allow-origin", "*")
+        end
+      end
+
+      context "when path is not allowed" do
         let(:path) { "/comments" }
 
         before(:each) do
@@ -443,9 +508,6 @@ describe "ProxyServer" do
     end
   end
 
-  context "request forwarding" do
-  end
-
   context "startup of ProxyServer" do
     def load_config(writer, config)
       fork do
@@ -483,5 +545,4 @@ describe "ProxyServer" do
       end
     end
   end
-
 end
