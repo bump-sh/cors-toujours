@@ -17,4 +17,5 @@ group :development, :test do
   gem "webmock"
   gem "dotenv"
   gem "standardrb", "~> 1.0"
+  gem "bundle-audit"
 end

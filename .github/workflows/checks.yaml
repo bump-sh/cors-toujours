@@ -23,3 +23,7 @@ jobs:
         shell: bash
       - name: Run RSpec tests
         run: bundle exec rspec spec
+      - name: Run bundle audit
+        run: |
+          bundle exec bundle-audit update
+          bundle exec bundle-audit
